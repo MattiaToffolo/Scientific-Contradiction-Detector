@@ -1,5 +1,7 @@
 # Scientific Contradiction Detector
 
+End-to-end AI system for automated scientific literature review. Type a biomedical claim, get a structured evidence report: which papers support it, which contradict it, and a written synthesis. Built with local LLMs (Ollama + llama3.2), RAG (ChromaDB + sentence-transformers), and Streamlit. Zero cost, fully private.
+
 ## Why this exists
 
 Scientific literature is enormous and contradictory. For almost every health claim, there are studies that support it and studies that refute it, scattered across thousands of papers published over decades. Reading them manually takes days. Hiring a researcher to do it costs money. And even then, human review is selective and prone to confirmation bias.
