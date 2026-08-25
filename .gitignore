@@ -1,0 +1,22 @@
+# Personal study notes — not part of the public project
+TEORIA.md
+PROJECT.md
+POST_LINKEDIN.md
+
+# Generated data — rebuild with fetch_papers.py + ingest.py
+data/
+chroma_db/
+
+# Local Python environments
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Personal secrets
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
