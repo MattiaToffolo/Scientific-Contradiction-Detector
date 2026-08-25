@@ -156,8 +156,6 @@ high-protein diet increases cancer risk
 ├── config.py                # Centralised configuration constants
 ├── requirements.txt
 ├── .env.example             # Copy to .env and add your PubMed API key
-├── PROJECT.md               # Full project documentation
-└── TEORIA.md                # Deep-dive on the AI concepts used
 ```
 
 ---
