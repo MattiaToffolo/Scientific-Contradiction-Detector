@@ -1,9 +1,9 @@
-# Personal study notes — not part of the public project
+# Personal study notes, not part of the public project
 TEORIA.md
 PROJECT.md
 POST_LINKEDIN.md
 
-# Generated data — rebuild with fetch_papers.py + ingest.py
+# Generated data, rebuild with fetch_papers.py + ingest.py
 data/
 chroma_db/
 
