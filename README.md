@@ -1,30 +1,32 @@
 # Scientific Contradiction Detector
 
-End-to-end AI system for automated scientific literature review. Type a biomedical claim, get a structured evidence report: which papers support it, which contradict it, and a written synthesis. Built with local LLMs (Ollama + llama3.2), RAG (ChromaDB + sentence-transformers), and Streamlit. Zero cost, fully private.
+A local AI prototype designed to help researchers and analysts organise biomedical evidence before a manual review. Enter a claim to explore potentially supporting, contradicting and neutral abstracts, with PubMed links and an LLM-generated summary. Built with Python, RAG, ChromaDB, LangChain, llama3.2 via Ollama, and Streamlit.
+
+**Research prototype, not a validated scientific or medical decision tool.** Classification errors remain substantial. All labels and summaries require checking against the original sources.
 
 ## Why this exists
 
-Scientific literature is enormous and contradictory. For almost every health claim, there are studies that support it and studies that refute it, scattered across thousands of papers published over decades. Reading them manually takes days. Hiring a researcher to do it costs money. And even then, human review is selective and prone to confirmation bias.
+Finding and comparing biomedical studies is time-consuming. Relevant evidence can be scattered across publications with different populations, interventions and outcomes.
 
-This tool automates that process. You type a claim like "metformin slows aging", "high-protein diets increase cancer risk", "gut microbiome influences Parkinson's disease", and within minutes you get a structured report that tells you what the current scientific literature actually says: how many papers support the claim, how many contradict it, and a written synthesis of the evidence.
+This project automates document organisation and produces a first-pass summary for manual investigation. It searches only the corpus you have downloaded and indexed, not all of PubMed at query time. It does not replace a systematic literature review, and time savings have not been measured in a user study.
 
 **What you gain:**
-- Hours of manual literature review compressed into a few minutes
-- An objective, evidence-based starting point for any health or biomedical decision
-- A repeatable, auditable process (every result is traceable to specific papers with PubMed links)
-- Zero subscription cost: the system runs entirely on your own machine with open-source models
+- A single interface for exploring retrieved abstracts and their predicted stances
+- Source links for checking the underlying studies
+- A reproducible evaluation script for measuring classification errors
+- Local inference without paid LLM APIs; hardware and electricity costs still apply
 
 **Who this is for:**
 - Researchers who need a first-pass scan of evidence before diving deep
 - Consultants and analysts who need to quickly validate or challenge a scientific claim
 - Anyone who needs to separate marketing claims from peer-reviewed evidence
 
-**Example questions you can answer in minutes:**
+**Example topics to investigate:**
 - Does intermittent fasting actually extend lifespan in humans, or mainly in mice?
-- Is the evidence for metformin as an anti-aging drug strong enough to act on?
+- What findings have been reported about metformin and aging?
 - How contested is the link between gut microbiome and neurological disease?
 
-Everything runs locally. No data is sent to any external service. No API subscription required.
+LLM inference runs locally through Ollama. Downloading papers sends search terms to PubMed, model downloads contact external registries, and evaluation downloads SciFact. This is not an entirely offline workflow. Review dependency telemetry settings before using sensitive data.
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue) ![Ollama](https://img.shields.io/badge/LLM-llama3.2-orange) ![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)
 
@@ -35,6 +37,8 @@ Everything runs locally. No data is sent to any external service. No API subscri
 1. **Fetch**: downloads abstracts from PubMed via the free E-utilities API
 2. **Ingest**: computes sentence embeddings and stores them in a local ChromaDB vector store
 3. **Analyse**: retrieves the 20 most relevant papers, asks an LLM to classify each one as SUPPORT / CONTRADICT / NEUTRAL, then generates a narrative synthesis report
+
+The app currently uses the original zero-shot classifier on the first 900 characters of each retrieved text. An experimental few-shot classifier uses full abstracts and structured JSON containing evidence, reasoning and a stance label. It is available for evaluation but is not enabled in the app: its development gains did not generalise to the held-out sample.
 
 ```
 User claim
@@ -82,7 +86,7 @@ C:\sc\venv\Scripts\Activate.ps1    # Windows PowerShell
 source venv/bin/activate            # Mac/Linux
 
 # 4. Install dependencies
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ---
@@ -117,7 +121,55 @@ python -m streamlit run app.py
 # Opens at http://localhost:8501
 ```
 
-You can run `fetch_papers.py` and `ingest.py` in a second terminal while the app is open. No restart needed.
+Activate the virtual environment in every new terminal. Fetching additional papers can run separately. Before re-indexing, stop Streamlit with Ctrl+C, run `python ingest.py`, then restart the app: indexing deletes and recreates the collection, so cached database handles should not be assumed to refresh safely.
+
+Download papers for each topic before trying the example claims below. The repository does not include the generated corpus or vector database.
+
+## Evaluation and Limitations
+
+Evaluation uses [SciFact](https://github.com/allenai/scifact), a human-annotated scientific claim verification dataset. These are custom, class-balanced subsets of its public development split, not official leaderboard results. Each example is a claim/abstract pair. Cited documents without annotated supporting or contradicting evidence are mapped to NEUTRAL.
+
+| Configuration | Sample | Accuracy | Macro-F1 |
+|---|---|---:|---:|
+| Original zero-shot baseline, 900 characters | Development: 60 pairs | 53.3% | 0.487 |
+| Original prompt with full abstracts | Same development pairs | 55.0% | 0.525 |
+| Few-shot prompt, full abstracts, structured JSON | Same development pairs | 66.7% | 0.612 |
+| Original baseline | Held out: 45 pairs | 48.9% | 0.448 |
+| Selected structured variant | Same held-out pairs | 42.2% | 0.339 |
+
+The development sample contains 20 examples per class; the held-out sample contains 15 per class, with no claim IDs or document IDs shared with development. The structured variant was selected on development data before evaluating the holdout. The holdout result rejected it as an app upgrade. Another development experiment with stricter entity rules and quote-based label filtering reached 53.3% accuracy and 0.535 macro-F1 and was also not selected.
+
+The selected variant improved contradiction recall but missed every NEUTRAL example in the holdout. Its 66.7% development accuracy must not be presented as general test accuracy. With only 45 held-out pairs, accuracy uncertainty is substantial: approximate 95% Wilson intervals are 34.9%-63.0% for the baseline and 29.0%-56.7% for the structured variant. These results do not establish a statistically significant difference.
+
+Additional limitations:
+
+* Evaluation covers stance classification, not retrieval relevance or report faithfulness.
+* These subsets do not establish performance on the application's PubMed corpus, and public benchmark exposure during model pretraining cannot be excluded.
+* The displayed consensus score is the fraction of predicted SUPPORT among non-neutral retrieved papers. It is not scientific consensus, a confidence estimate, or a measure of study quality. If every paper is neutral, the current implementation returns 50% as a fallback, not evidence of disagreement.
+* The baseline's internal confidence and probability fields are fixed placeholders, not measured probabilities. The structured variant's quote-presence flag checks only text matching, not whether the quote logically supports the label.
+* Only abstracts are assessed. A report is generated from at most five supporting and five contradicting snippets, each limited to 400 characters. Findings, populations and safety trade-offs can therefore be missed.
+
+### Reproduce the Comparison
+
+Run these from the project root with the virtual environment active and Ollama running. Each output directory must be new: the script refuses to overwrite saved predictions. Evaluation does not require rebuilding ChromaDB.
+
+```powershell
+python evaluate_stance.py --self-test
+
+# Original baseline on the development sample
+python evaluate_stance.py --baseline --per-class 20 --seed 20261017 --output evaluation_results/reproduction_dev_baseline
+
+# Experimental classifier on the exact same development pairs
+python evaluate_stance.py --input-sample evaluation_results/reproduction_dev_baseline/sample.json --output evaluation_results/reproduction_dev_structured
+
+# New pairs excluding development claims and documents
+python evaluate_stance.py --baseline --per-class 15 --seed 20261018 --exclude-sample evaluation_results/reproduction_dev_baseline/sample.json --output evaluation_results/reproduction_holdout_baseline
+
+# Selected experimental configuration on the same held-out pairs
+python evaluate_stance.py --input-sample evaluation_results/reproduction_holdout_baseline/sample.json --output evaluation_results/reproduction_holdout_structured
+```
+
+Each run saves its sample, raw responses, predictions, per-class metrics, confusion matrix, accuracy interval, prompt, runtime settings and source hash. Local inference can take tens of minutes per run. Fixed seeds aid repeatability but do not guarantee identical outputs across software versions or hardware. Do not tune on the holdout and then describe it as an untouched test set.
 
 ---
 
@@ -154,8 +206,9 @@ high-protein diet increases cancer risk
 ├── contradiction_engine.py  # Core RAG + LLM pipeline
 ├── app.py                   # Streamlit UI
 ├── config.py                # Centralised configuration constants
+├── evaluate_stance.py       # SciFact stance evaluation and metric/parser checks
 ├── requirements.txt
-├── .env.example             # Copy to .env and add your PubMed API key
+└── .env.example             # Copy to .env and add your PubMed API key
 ```
 
 ---
